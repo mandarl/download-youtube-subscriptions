@@ -21,7 +21,7 @@ fi
 }
 
 # Set this according to preference
-set_default VIDEO_DIR "$(xdg-user-dir VIDEOS)" "$HOME/Videos"
+set_default VIDEO_DIR "c:/temp/Videos/Youtube"
 YOUTUBE_USER="$(first "$1" "$YOUTUBE_USER")"
 shift
 
@@ -59,8 +59,8 @@ COMPLETED_DIR=$VIDEO_DIR/.done
 mkdir -p $QUEUE_DIR $COMPLETED_DIR
 
 # http://en.wikipedia.org/wiki/YouTube#Quality_and_codecs
-DOWNLOAD_OPTS="--ignore-errors --continue --output=%(upload_date)s-%(stitle)s.%(ext)s --format=18"
-DOWNLOAD_OPTS_ANY_FORMAT="--ignore-errors --continue --output=%(upload_date)s-%(stitle)s.%(ext)s"
+DOWNLOAD_OPTS="--ignore-errors --verbose --continue --output=%(uploader)s-%(upload_date)s-%(stitle)s.%(ext)s --max-quality=18"
+DOWNLOAD_OPTS_ANY_FORMAT="--ignore-errors --continue --output=%(uploader)s-%(upload_date)s-%(stitle)s.%(ext)s"
 
 get_title () {
   if [ -s $QUEUE_DIR/$1 ]; then
@@ -68,7 +68,7 @@ get_title () {
   elif [ -s $COMPLETED_DIR/$1 ]; then
     echo $(cat $COMPLETED_DIR/$1);
   else
-    echo $(youtube-dl $DOWNLOAD_OPTS_ANY_FORMAT --get-title -- "$1")
+    echo $(youtube-dl.py $DOWNLOAD_OPTS_ANY_FORMAT --get-title -- "$1") | sed 's/[^a-zA-Z0-9 \-]//g'
   fi
 }
 
@@ -105,8 +105,14 @@ mark_hash_done () {
 
 cleanup_done_hashes () {
   # Delete all but the 100 newest done files
-  ls $DONE_DIR | head -n-100 | while read old_hash; do
-    rm -f $DONE_DIR/old_hash
+  echo *********$COMPLETED_DIR
+  ls $COMPLETED_DIR
+  ls -1 $COMPLETED_DIR | head -n-100 | while read old_hash; do
+    rm -f $COMPLETED_DIR/old_hash
+  done
+  # Delete all but the 100 newest videos
+  ls *.mp4 | head -n-100 | while read old_video; do
+    rm -f old_video
   done
 }
 
@@ -115,7 +121,7 @@ get_queued_hashes () {
 }
 
 get_subscription_hashes () {
-  wget -q -O- 'http://gdata.youtube.com/feeds/api/users/'"$YOUTUBE_USER"'/newsubscriptionvideos?prettyprint=true&fields=entry%28link[@rel=%27alternate%27]%28@href%29%29' | perl -lane 'print "$1" if m{\Qhttp://www.youtube.com/watch?v=\E([^&]+)}' | tac
+  wget -q -O- 'http://gdata.youtube.com/feeds/api/users/'"$YOUTUBE_USER"'/newsubscriptionvideos?prettyprint=true&fields=entry%28link[@rel=%27alternate%27]%28@href%29%29' | perl -lane 'print "$1" if m{\Qhttp://www.youtube.com/watch?v=\E([^&]+)}'
 }
 
 enqueue_new_hashes () {
@@ -142,7 +148,7 @@ enqueue_new_hashes () {
 dl_hash () {
   desc="$(describe_hash $1)"
   echo "Downloading video $desc"
-  if youtube-dl $DOWNLOAD_OPTS -- $1; then
+  if youtube-dl.py $DOWNLOAD_OPTS -- $1; then
     mark_hash_done $1
     echo "Download completed: $desc"
   else
